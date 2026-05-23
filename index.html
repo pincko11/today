@@ -435,6 +435,7 @@
     <h3>仅限本人使用</h3>
     <p>请输入访问密码</p>
     <input type="password" id="gateInput" placeholder="······" maxlength="20" autocomplete="off">
+    <button id="gateBtn" style="width:100%;margin-top:12px;padding:12px;background:#6c5da7;color:#fff;border:none;border-radius:14px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;">确 认</button>
     <div class="gate-hint" id="gateHint"></div>
   </div>
 </div>
@@ -552,6 +553,7 @@
     input.addEventListener('keydown', function(e) {
       if (e.key === 'Enter') tryUnlock();
     });
+    document.getElementById('gateBtn').addEventListener('click', tryUnlock);
     // 输入时清除错误提示
     input.addEventListener('input', function() {
       hint.textContent = '';

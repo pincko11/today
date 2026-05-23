@@ -532,7 +532,7 @@
     const hint = document.getElementById('gateHint');
 
     // 已解锁则跳过
-    if (sessionStorage.getItem('unlocked') === '1') {
+    if (localStorage.getItem('daily3_unlocked') === '1') {
       gate.classList.add('hidden');
       return;
     }
@@ -545,7 +545,7 @@
       const hashHex = Array.from(new Uint8Array(hashBuf))
         .map(b => b.toString(16).padStart(2, '0')).join('');
       if (hashHex === STORED_HASH) {
-        sessionStorage.setItem('unlocked', '1');
+        localStorage.setItem('daily3_unlocked', '1');
         gate.classList.add('hidden');
       } else {
         input.classList.add('wrong');

@@ -1,10 +1,11 @@
 // 离线缓存——首次加载后，没有网络也能用
-const CACHE = 'daily3-v1';
+const CACHE = 'daily3-v2';
 const FILES = [
   './',
   './index.html',
   './manifest.json',
   './icon.svg',
+  './icon.png',
   './xavier.jpg',
   './zayne.jpg',
   './rafayel.jpg',

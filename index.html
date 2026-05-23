@@ -532,6 +532,9 @@
     const hint = document.getElementById('gateHint');
 
     // 已解锁则跳过
+    // TEMP: 临时关闭密码锁用于APK生成
+      gate.classList.add('hidden');
+      return;
     if (localStorage.getItem('daily3_unlocked') === '1') {
       gate.classList.add('hidden');
       return;

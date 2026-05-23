@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>今日</title>
+<!-- PWA：手机安装为独立 App -->
+<link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="今日">
+<meta name="theme-color" content="#6c5da7">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<style>
+  :root {
+    --pink: #f0a0b8;
+    --purple: #6c5da7;
+    --purple-dark: #584b8a;
+    --bg: #faf8fd;
+    --card: #ffffff;
+    --text: #2d2640;
+    --text-secondary: #8b80a8;
+    --text-muted: #bfb8d0;
+    --green: #4db87a;
+    --green-bg: #edf8f1;
+    --red: #e06868;
+    --red-bg: #fef0f0;
+    --radius-sm: 12px;
+    --radius: 18px;
+    --radius-lg: 24px;
+    --shadow-sm: 0 1px 3px rgba(45,38,64,0.04), 0 1px 2px rgba(45,38,64,0.06);
+    --shadow: 0 4px 20px rgba(45,38,64,0.06), 0 1px 3px rgba(45,38,64,0.04);
+    --shadow-lg: 0 8px 32px rgba(45,38,64,0.08), 0 2px 8px rgba(45,38,64,0.04);
+    --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    --bounce: 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    background: var(--bg);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 20px 16px 80px;
+    color: #1e1835;
+    -webkit-font-smoothing: antialiased;
+    background-image:
+      radial-gradient(ellipse 80% 50% at 50% -20%, #fef0f4 0%, transparent 60%),
+      radial-gradient(ellipse 60% 40% at 100% 80%, #f5f0fc 0%, transparent 50%);
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+  }
+
+  .container { width: 100%; max-width: 440px; }
+
+  /* ================================================================
+     HEADER
+     ================================================================ */
+  header { text-align: center; margin-bottom: 20px; padding-top: 8px; }
+
+  .avatar-row {
+    display: flex; justify-content: center; align-items: flex-start;
+    gap: 14px; margin-bottom: 14px; padding: 6px 0;
+  }
+
+  .avatar-wrap {
+    display: flex; flex-direction: column;
+    align-items: center; gap: 6px;
+    cursor: pointer;
+    position: relative;
+  }
+
+  .avatar {
+    width: 72px; height: 72px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid #fff;
+    box-shadow: 0 2px 12px rgba(45,38,64,0.10), 0 0 0 4px rgba(108,93,167,0.08);
+    transition: transform var(--bounce), box-shadow var(--bounce);
+    background: #f0ecf6;
+  }
+  .avatar-wrap:hover .avatar {
+    transform: translateY(-6px) scale(1.15);
+    box-shadow: 0 8px 28px rgba(45,38,64,0.16), 0 0 0 8px rgba(108,93,167,0.12);
+    z-index: 5;
+  }
+
+  /* 语录闪烁光晕 */
+  .avatar.quote-active {
+    animation: avatar-quote-glow 0.5s ease-in-out 3;
+  }
+  @keyframes avatar-quote-glow {
+    0%, 100% { box-shadow: 0 2px 12px rgba(45,38,64,0.10), 0 0 0 4px rgba(108,93,167,0.08); }
+    50% { box-shadow: 0 2px 24px rgba(240,160,184,0.45), 0 0 0 14px rgba(240,160,184,0.25); }
+  }
+
+  /* 名字 */
+  .avatar-wrap .avatar-name-static {
+    font-size: 11px; color: var(--text-secondary); font-weight: 500;
+    text-align: center; white-space: nowrap;
+  }
+
+  /* 语录行——头像和标题之间，正常流式，不遮挡 */
+  .quote-line {
+    text-align: center;
+    font-size: 13px; font-weight: 500;
+    color: var(--purple);
+    min-height: 22px;
+    line-height: 1.5;
+    padding: 0 8px;
+    margin-bottom: 2px;
+    opacity: 0;
+    transition: opacity 0.35s ease;
+  }
+
+  header h1 {
+    font-size: 28px; font-weight: 700; letter-spacing: -0.3px;
+    background: linear-gradient(135deg, var(--purple) 0%, #c080a0 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 4px;
+  }
+  header .date {
+    color: var(--text-secondary); font-size: 14px; font-weight: 450;
+  }
+
+  /* ================================================================
+     MAIN CARD — 夸夸图透明背景 + 打卡 + 任务
+     ================================================================ */
+  .main-card {
+    position: relative;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    margin-bottom: 14px;
+    background: #fff;
+    box-shadow: var(--shadow-lg);
+    transition: box-shadow var(--transition), transform var(--transition);
+  }
+  .main-card:hover {
+    box-shadow: 0 12px 40px rgba(45,38,64,0.12), 0 4px 12px rgba(45,38,64,0.06);
+    transform: translateY(-1px);
+  }
+
+  /* 夸夸图铺满卡片，透出原图白色背景 */
+  .main-card-bg {
+    position: absolute;
+    inset: 0; width: 100%; height: 100%;
+    object-fit: cover;
+    opacity: 0.55;
+  }
+
+  /* 极淡遮罩——仅保证文字可读，不压暗图片 */
+  .main-card::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(180deg,
+      rgba(255,255,255,0.50) 0%,
+      rgba(255,255,255,0.15) 55%,
+      rgba(255,255,255,0.55) 100%);
+    border-radius: inherit; pointer-events: none; z-index: 1;
+  }
+
+  /* 卡片内容 */
+  .main-card-inner {
+    position: relative; z-index: 2; padding: 24px 22px 18px;
+    color: #1e1835;
+  }
+
+  /* ── 打卡区 ── */
+  .streak-area {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 18px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid rgba(0,0,0,0.08);
+    color: #1e1835;
+  }
+  .streak-number {
+    font-size: 54px; font-weight: 800; letter-spacing: -2px;
+    line-height: 1; color: #1e1835;
+  }
+  .streak-unit {
+    font-size: 20px; font-weight: 600;
+    color: #3d3552;
+    margin-left: 2px;
+  }
+  .streak-subtitle {
+    font-size: 13px; color: #3d3552; font-weight: 500;
+    margin-top: 3px; line-height: 1.4;
+  }
+  .streak-subtitle .emoji { font-size: 16px; }
+
+  /* ── 任务区 ── */
+  .task-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .task-header h2 {
+    font-size: 14px; font-weight: 600;
+    color: #1e1835; font-weight: 650;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .task-count {
+    font-size: 12px; color: #5d5278; font-weight: 500;
+  }
+
+  .task-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 11px 14px; margin-bottom: 5px;
+    border-radius: var(--radius-sm);
+    background: rgba(108,93,167,0.10);
+    transition: all var(--transition);
+    cursor: pointer;
+  }
+  .task-row:last-of-type { margin-bottom: 0; }
+  .task-row:hover { background: rgba(108,93,167,0.16); }
+  .task-row.done { background: var(--green-bg); }
+  .task-row.done .task-text { color: #7b9e86; }
+
+  .check-box {
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    border: 2px solid #d5cee4;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    transition: all var(--bounce);
+    background: #fff;
+  }
+  .task-row.done .check-box {
+    background: var(--green); border-color: var(--green);
+    animation: pop-check 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  @keyframes pop-check {
+    0% { transform: scale(1); }
+    40% { transform: scale(1.25); }
+    100% { transform: scale(1); }
+  }
+  .check-box svg {
+    width: 13px; height: 13px; opacity: 0; transform: scale(0);
+    transition: all var(--bounce);
+  }
+  .task-row.done .check-box svg { opacity: 1; transform: scale(1); }
+
+  .task-text {
+    flex: 1; font-size: 15px; font-weight: 450;
+    color: #1e1835;
+    transition: color var(--transition);
+  }
+  .task-row.done .task-text {
+    text-decoration: line-through;
+    text-decoration-color: rgba(107,158,128,0.30);
+    text-decoration-thickness: 1.5px;
+    color: #7b9e86;
+  }
+
+  .task-delete {
+    opacity: 0;
+    width: 26px; height: 26px; border-radius: 50%;
+    border: none;
+    background: rgba(108,93,167,0.08);
+    color: var(--text-muted);
+    cursor: pointer; font-size: 16px;
+    transition: all var(--transition);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .task-row:hover .task-delete { opacity: 1; }
+  .task-delete:hover { background: rgba(224,104,104,0.20); color: var(--red); }
+
+  /* 添加任务 */
+  .add-task {
+    display: flex; gap: 8px; margin-top: 10px;
+  }
+  .add-task input {
+    flex: 1;
+    border: 2px dashed #d8d2e8;
+    border-radius: var(--radius-sm);
+    padding: 10px 15px; font-size: 14px;
+    background: rgba(255,255,255,0.7);
+    color: #1e1835; outline: none;
+    transition: all var(--transition);
+    font-family: inherit;
+  }
+  .add-task input:focus {
+    border-color: var(--purple);
+    background: rgba(255,255,255,0.9);
+    box-shadow: 0 0 0 3px rgba(108,93,167,0.08);
+  }
+  .add-task input::placeholder { color: var(--text-muted); }
+
+  .add-task button {
+    background: var(--purple);
+    color: #fff; border: none;
+    border-radius: var(--radius-sm);
+    padding: 10px 20px; font-size: 14px; font-weight: 600;
+    cursor: pointer; transition: all var(--transition);
+    white-space: nowrap; font-family: inherit;
+  }
+  .add-task button:hover { background: var(--purple-dark); }
+  .add-task button:active { transform: scale(0.95); }
+
+  .empty-hint {
+    text-align: center; color: #4d4268; font-weight: 500;
+    font-size: 13px; padding: 14px 0 6px; line-height: 1.6;
+  }
+
+  /* ================================================================
+     CELEBRATE
+     ================================================================ */
+  .celebrate {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none; z-index: 999;
+  }
+  .confetti {
+    position: absolute; width: 10px; height: 10px; border-radius: 3px;
+    animation: confetti-fall 2.8s ease-out forwards;
+  }
+  @keyframes confetti-fall {
+    0% { transform: translateY(-100px) rotate(0deg) scale(1); opacity: 1; }
+    80% { opacity: 1; }
+    100% { transform: translateY(105vh) rotate(900deg) scale(0.3); opacity: 0; }
+  }
+
+  /* ================================================================
+     HISTORY
+     ================================================================ */
+  .history-section { margin-top: 2px; }
+  .history-toggle {
+    display: flex; align-items: center; gap: 6px;
+    color: var(--text-secondary); font-size: 13px; font-weight: 500;
+    cursor: pointer; padding: 10px 4px; user-select: none;
+    transition: color var(--transition);
+  }
+  .history-toggle:hover { color: #1e1835; }
+  .history-arrow {
+    font-size: 10px; transition: transform var(--transition); display: inline-block;
+  }
+  .history-toggle.open .history-arrow { transform: rotate(90deg); }
+
+  .history-list { display: none; }
+  .history-list.open { display: block; }
+
+  .history-day {
+    background: var(--card); border-radius: var(--radius);
+    padding: 14px 18px; margin-bottom: 8px;
+    box-shadow: var(--shadow-sm); border: 1px solid rgba(0,0,0,0.02);
+  }
+  .history-day .h-date {
+    font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; font-weight: 500;
+  }
+  .history-day .h-task {
+    font-size: 13px; padding: 3px 0; display: flex; align-items: center; gap: 8px;
+  }
+  .history-day .h-task .dot {
+    width: 7px; height: 7px; border-radius: 50%; background: var(--green); flex-shrink: 0;
+  }
+  .history-day .h-task.undone { color: var(--text-muted); }
+  .history-day .h-task.undone .dot { background: #e0dae8; }
+
+  /* ================================================================
+     PASSWORD GATE — 密码门禁
+     ================================================================ */
+  .gate {
+    position: fixed; inset: 0;
+    background: #faf8fd;
+    z-index: 9999;
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column;
+  }
+  .gate.hidden {
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.5s ease;
+  }
+  .gate-card {
+    background: #fff;
+    border-radius: 24px;
+    padding: 36px 28px 28px;
+    box-shadow: 0 8px 40px rgba(45,38,64,0.10);
+    text-align: center;
+    max-width: 300px; width: 90%;
+  }
+  .gate-icon { font-size: 48px; margin-bottom: 12px; }
+  .gate-card h3 {
+    font-size: 18px; font-weight: 700; color: #2d2640;
+    margin-bottom: 4px;
+  }
+  .gate-card p {
+    font-size: 12px; color: #8b80a8;
+    margin-bottom: 20px;
+  }
+  .gate-card input {
+    width: 100%;
+    border: 2px solid #e2dcec;
+    border-radius: 14px;
+    padding: 12px 16px;
+    font-size: 16px;
+    text-align: center;
+    outline: none;
+    font-family: inherit;
+    transition: border-color 0.2s;
+    -webkit-text-security: disc;
+  }
+  .gate-card input:focus { border-color: #6c5da7; }
+  .gate-card input.wrong {
+    border-color: #e06868;
+    animation: shake 0.5s ease;
+  }
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-8px); }
+    40% { transform: translateX(8px); }
+    60% { transform: translateX(-5px); }
+    80% { transform: translateX(5px); }
+  }
+  .gate-hint {
+    font-size: 11px; color: #e06868;
+    margin-top: 8px; min-height: 18px;
+  }
+
+  @media (max-width: 380px) {
+    .avatar { width: 56px; height: 56px; }
+    .avatar-row { gap: 6px; }
+    .streak-number { font-size: 44px; }
+    .main-card-inner { padding: 20px 16px 14px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- 密码门禁 -->
+<div class="gate" id="gate">
+  <div class="gate-card">
+    <div class="gate-icon">🔒</div>
+    <h3>仅限本人使用</h3>
+    <p>请输入访问密码</p>
+    <input type="password" id="gateInput" placeholder="······" maxlength="20" autocomplete="off">
+    <div class="gate-hint" id="gateHint"></div>
+  </div>
+</div>
+
+<div class="container">
+  <header>
+    <div class="avatar-row">
+      <!-- 沈星回 -->
+      <div class="avatar-wrap" data-char="xavier">
+        <img class="avatar" src="xavier.jpg" alt="沈星回" data-char="xavier">
+        <span class="avatar-name-static">沈星回</span>
+            </div>
+      <!-- 黎深 -->
+      <div class="avatar-wrap" data-char="zayne">
+        <img class="avatar" src="zayne.jpg" alt="黎深" data-char="zayne">
+        <span class="avatar-name-static">黎深</span>
+            </div>
+      <!-- 祁煜 -->
+      <div class="avatar-wrap" data-char="rafayel">
+        <img class="avatar" src="rafayel.jpg" alt="祁煜" data-char="rafayel">
+        <span class="avatar-name-static">祁煜</span>
+            </div>
+      <!-- 秦彻 -->
+      <div class="avatar-wrap" data-char="sylus">
+        <img class="avatar" src="sylus.jpg" alt="秦彻" data-char="sylus">
+        <span class="avatar-name-static">秦彻</span>
+            </div>
+      <!-- 夏以昼 -->
+      <div class="avatar-wrap" data-char="caleb">
+        <img class="avatar" src="caleb.jpg" alt="夏以昼" data-char="caleb">
+        <span class="avatar-name-static">夏以昼</span>
+            </div>
+    </div>
+    <div class="quote-line" id="quoteLine"></div>
+    <h1>每日三件事</h1>
+    <div class="date" id="dateDisplay"></div>
+  </header>
+
+  <!-- 合并卡片：夸夸图透明背景 + 打卡 + 任务 -->
+  <div class="main-card">
+    <img class="main-card-bg" src="kuakua.jpg" alt=""
+         onerror="this.style.display='none';">
+    <div class="main-card-inner">
+      <div class="streak-area">
+        <div>
+          <div>
+            <span class="streak-number" id="streakCount">0</span>
+            <span class="streak-unit">天</span>
+          </div>
+          <div class="streak-subtitle" id="streakMessage">今天开始你的第一次打卡！</div>
+        </div>
+      </div>
+
+      <div class="task-header">
+        <h2>📋 今日任务</h2>
+        <span class="task-count" id="taskCountLabel">0/3</span>
+      </div>
+      <div id="taskList"></div>
+      <div class="add-task" id="addTaskRow" style="display:none;">
+        <input type="text" id="taskInput" placeholder="今天最重要的一件事是..." maxlength="60">
+        <button id="addBtn">＋ 添加</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 历史记录 -->
+  <div class="history-section">
+    <div class="history-toggle" id="historyToggle">
+      <span class="history-arrow" id="historyArrow">▶</span>
+      历史记录
+      <span style="font-size:11px;color:var(--text-muted);" id="historyCount"></span>
+    </div>
+    <div class="history-list" id="historyList"></div>
+  </div>
+
+  <div class="celebrate" id="celebrateLayer"></div>
+</div>
+
+<script>
+  /* ==================================================================
+     PASSWORD GATE — SHA-256 验证
+     修改密码：在终端执行
+     python -c "import hashlib; print(hashlib.sha256('新密码'.encode()).hexdigest())"
+     然后把输出的哈希值替换下面 STORED_HASH 的值
+     ================================================================== */
+  (async function() {
+    const STORED_HASH = 'f2ce7d7c04e847b35dafb9edc2d044c7085c308270645b40b56a9df7ed01abea';
+    const gate = document.getElementById('gate');
+    const input = document.getElementById('gateInput');
+    const hint = document.getElementById('gateHint');
+
+    // 已解锁则跳过
+    if (sessionStorage.getItem('unlocked') === '1') {
+      gate.classList.add('hidden');
+      return;
+    }
+
+    async function tryUnlock() {
+      const pw = input.value.trim();
+      if (!pw) return;
+      const hashBuf = await crypto.subtle.digest('SHA-256',
+        new TextEncoder().encode(pw));
+      const hashHex = Array.from(new Uint8Array(hashBuf))
+        .map(b => b.toString(16).padStart(2, '0')).join('');
+      if (hashHex === STORED_HASH) {
+        sessionStorage.setItem('unlocked', '1');
+        gate.classList.add('hidden');
+      } else {
+        input.classList.add('wrong');
+        hint.textContent = '密码错误，请重试';
+        setTimeout(() => input.classList.remove('wrong'), 500);
+      }
+    }
+
+    input.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') tryUnlock();
+    });
+    // 输入时清除错误提示
+    input.addEventListener('input', function() {
+      hint.textContent = '';
+    });
+    // 页面加载后自动聚焦
+    input.focus();
+  })();
+
+  /* ==================================================================
+     DATA
+     ================================================================== */
+  function todayKey() {
+    const d = new Date();
+    return d.getFullYear() + '-' +
+           String(d.getMonth() + 1).padStart(2, '0') + '-' +
+           String(d.getDate()).padStart(2, '0');
+  }
+  function loadData() {
+    try { return JSON.parse(localStorage.getItem('daily3_data')) || {}; }
+    catch (e) { return {}; }
+  }
+  function saveData(data) { localStorage.setItem('daily3_data', JSON.stringify(data)); }
+
+  function calcStreak(data) {
+    let streak = 0; const d = new Date(); const tk = todayKey();
+    while (true) {
+      const key = d.getFullYear() + '-' +
+                  String(d.getMonth() + 1).padStart(2, '0') + '-' +
+                  String(d.getDate()).padStart(2, '0');
+      const tasks = data[key];
+      if (!tasks || tasks.length === 0) break;
+      if (key === tk) { streak++; break; }
+      if (!tasks.every(t => t.done)) break;
+      streak++;
+      d.setDate(d.getDate() - 1);
+    }
+    return streak;
+  }
+
+  let data = loadData();
+  const today = todayKey();
+  if (!data[today]) data[today] = [];
+
+  const now = new Date();
+  const weekNames = ['日', '一', '二', '三', '四', '五', '六'];
+  document.getElementById('dateDisplay').textContent =
+    now.getFullYear() + '年' + (now.getMonth() + 1) + '月' + now.getDate() + '日' +
+    ' · 星期' + weekNames[now.getDay()];
+
+  function updateStreak() {
+    const s = calcStreak(data);
+    document.getElementById('streakCount').textContent = s;
+    const msg = document.getElementById('streakMessage');
+    if (s === 0) msg.innerHTML = '<span class="emoji">🌱</span> 今天开始你的第一次打卡！';
+    else if (s < 3) msg.innerHTML = '<span class="emoji">💪</span> 好的开始！继续保持';
+    else if (s < 7) msg.innerHTML = '<span class="emoji">🔥</span> 连续' + s + '天，渐入佳境';
+    else if (s < 14) msg.innerHTML = '<span class="emoji">⭐</span> 一周以上了，你认真的！';
+    else if (s < 30) msg.innerHTML = '<span class="emoji">🏆</span> 连续' + s + '天，已成本能';
+    else msg.innerHTML = '<span class="emoji">👑</span> 连续' + s + '天！拖延症已被击败';
+  }
+  updateStreak();
+
+  /* ==================================================================
+     TASKS
+     ================================================================== */
+  const taskList = document.getElementById('taskList');
+  const addTaskRow = document.getElementById('addTaskRow');
+  const taskCountLabel = document.getElementById('taskCountLabel');
+
+  function renderTasks() {
+    taskList.innerHTML = '';
+    const list = data[today];
+    if (list.length === 0) {
+      taskList.innerHTML = '<div class="empty-hint">✨ 写下今天最重要的三件事，完成它们！</div>';
+    }
+    list.forEach((task, i) => {
+      const row = document.createElement('div');
+      row.className = 'task-row' + (task.done ? ' done' : '');
+      row.innerHTML = `
+        <div class="check-box">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5"
+               stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="4 12 10 18 20 6"></polyline>
+          </svg>
+        </div>
+        <span class="task-text">${escapeHtml(task.text)}</span>
+        <button class="task-delete" title="删除">×</button>
+      `;
+      row.addEventListener('click', function(e) {
+        if (e.target.closest('.task-delete')) return;
+        task.done = !task.done;
+        saveData(data);
+        renderTasks();
+        updateStreak();
+        if (task.done) checkAllDone();
+      });
+      row.querySelector('.task-delete').addEventListener('click', function(e) {
+        e.stopPropagation();
+        list.splice(i, 1);
+        saveData(data);
+        renderTasks();
+        updateStreak();
+      });
+      taskList.appendChild(row);
+    });
+    const dc = list.filter(t => t.done).length;
+    taskCountLabel.textContent = dc + '/' + list.length;
+    addTaskRow.style.display = list.length < 3 ? 'flex' : 'none';
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  document.getElementById('addBtn').addEventListener('click', addTask);
+  document.getElementById('taskInput').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') addTask();
+  });
+  function addTask() {
+    const input = document.getElementById('taskInput');
+    const text = input.value.trim();
+    if (!text) return;
+    if (data[today].length >= 3) return;
+    data[today].push({ text: text, done: false });
+    saveData(data);
+    input.value = '';
+    renderTasks();
+    updateStreak();
+  }
+
+  function checkAllDone() {
+    const list = data[today];
+    if (list.length === 3 && list.every(t => t.done)) {
+      updateStreak();
+      launchConfetti();
+    }
+  }
+  function launchConfetti() {
+    const layer = document.getElementById('celebrateLayer');
+    const colors = ['#f0a0b8','#6c5da7','#f7d794','#4db87a','#f19066',
+                    '#778beb','#e77f67','#cf6a87','#63cdda','#f3a683'];
+    const frag = document.createDocumentFragment();
+    for (let i = 0; i < 70; i++) {
+      const c = document.createElement('div'); c.className = 'confetti';
+      c.style.left = Math.random()*100+'%';
+      c.style.top = -(Math.random()*60)+'px';
+      c.style.backgroundColor = colors[Math.floor(Math.random()*colors.length)];
+      c.style.animationDelay = Math.random()*0.6+'s';
+      c.style.animationDuration = (2.2+Math.random()*2.2)+'s';
+      c.style.width = (8+Math.random()*10)+'px';
+      c.style.height = (8+Math.random()*10)+'px';
+      c.addEventListener('animationend', function(){ c.remove(); });
+      frag.appendChild(c);
+    }
+    layer.appendChild(frag);
+  }
+
+  /* ==================================================================
+     HISTORY
+     ================================================================== */
+  const historyToggle = document.getElementById('historyToggle');
+  const historyList = document.getElementById('historyList');
+  historyToggle.addEventListener('click', function() {
+    const isOpen = historyList.classList.toggle('open');
+    historyToggle.classList.toggle('open', isOpen);
+    if (isOpen) renderHistory();
+  });
+  function renderHistory() {
+    const keys = Object.keys(data).filter(k => k !== today).sort().reverse().slice(0, 30);
+    document.getElementById('historyCount').textContent = keys.length ? '（'+keys.length+'天）' : '';
+    if (keys.length === 0) {
+      historyList.innerHTML = '<div class="empty-hint">还没有历史记录，从今天开始吧！</div>';
+      return;
+    }
+    historyList.innerHTML = keys.map(key => {
+      const tasks = data[key];
+      const icon = tasks.length>0 && tasks.every(t=>t.done) ? '✅' : '📝';
+      return `<div class="history-day"><div class="h-date">${icon} ${key}</div>
+        ${tasks.map(t=>`<div class="h-task${t.done?'':' undone'}"><div class="dot"></div>${escapeHtml(t.text)}</div>`).join('')}
+      </div>`;
+    }).join('');
+  }
+
+  /* ==================================================================
+     QUOTES — 来自B站/微博/微信等平台高赞语录，点击头像随机显示
+     ================================================================== */
+  const characterQuotes = {
+    xavier: [
+      '如果这个世界真的已经无处可逃，那至少，你还可以逃来我身边。',
+      '还是让星星自己落下来，留在你身边吧。',
+      '我的光芒，只朝向你在的方向。',
+      '你在哪里，光就在哪里。',
+      '我不会离开，因为你还在这里。',
+      '才说了再见，就开始想你。'
+    ],
+    zayne: [
+      '我的目光，属于你很久了。',
+      '你是我最见效的药。',
+      '不着急走的话，一起等雨停吧。',
+      '想见我不用挂号，直说就行。',
+      '如果是周末见你，我一般从周四开始高兴。',
+      '拥抱不是生病才有的特权。'
+    ],
+    rafayel: [
+      '海底三万里，万物静寂，世间再无第二个利莫里亚。',
+      '你相信，海底也会燃起火焰吗？',
+      '遇见你是一场宇宙级的浪漫邂逅。',
+      '那我把我的心给你，你要吗？',
+      '曾经的海神，为了心爱的人欺骗了整个海洋。',
+      '当天空变成你眼睛的颜色，我就会在这片我们相遇的海上重新爱上你。'
+    ],
+    sylus: [
+      '我是来给她撑腰的，不是看谁对谁错的。',
+      '我的心很小，小到只能装下一个你。',
+      '累就休息，难过就哭出来，什么都不想做就不做。',
+      '在我面前，你永远有随心所欲的权利。',
+      '该利用我的时候别客气。',
+      '没有你在的世界我不想适应。'
+    ],
+    caleb: [
+      '想和你留在从前，只有我们两人的世界里。',
+      '我从来都不是你的哥哥。',
+      '我不罩着你，难道还要别的人来？',
+      '那你也拥有一点罪，好不好，别让我太孤独了。',
+      '不用平分，我的都归你。',
+      '只想降落在你身边。'
+    ]
+  };
+
+  // 点击头像 → 语录显示在头像和标题之间的 quote-line
+  const quoteLine = document.getElementById('quoteLine');
+  let quoteTimer = null;
+
+  document.querySelectorAll('.avatar-wrap').forEach(wrap => {
+    wrap.addEventListener('click', function() {
+      const charKey = this.dataset.char;
+      if (!charKey) return;
+
+      const quotes = characterQuotes[charKey];
+      if (!quotes) return;
+
+      const quote = quotes[Math.floor(Math.random() * quotes.length)];
+      const avatar = this.querySelector('.avatar');
+
+      // 光晕动画
+      avatar.classList.add('quote-active');
+      setTimeout(() => avatar.classList.remove('quote-active'), 1500);
+
+      // 显示在中间语录行
+      quoteLine.textContent = '「' + quote + '」';
+      quoteLine.style.opacity = '1';
+
+      // 5秒后渐隐
+      clearTimeout(quoteTimer);
+      quoteTimer = setTimeout(() => {
+        quoteLine.style.opacity = '0';
+      }, 5000);
+    });
+  });
+
+  renderTasks();
+
+  // 注册离线 Service Worker
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js');
+  }
+</script>
+</body>
+</html>

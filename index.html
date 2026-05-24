@@ -721,6 +721,7 @@
       });
       row.querySelector('.task-delete').addEventListener('click', function(e) {
         e.stopPropagation();
+        if (task.done) { addXP(-10); }
         list.splice(i, 1);
         saveData(data);
         renderTasks();

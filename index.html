@@ -1016,9 +1016,24 @@
 
   updateLvUI();
 
-  // 注册离线 Service Worker
+  // 注册 Service Worker + 自动更新
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js');
+    navigator.serviceWorker.register('sw.js').then(reg => {
+      // 检测到新版本 → 自动刷新页面
+      reg.addEventListener('updatefound', () => {
+        const newSW = reg.installing;
+        newSW.addEventListener('statechange', () => {
+          if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
+            // 新 SW 已就绪，通知旧 SW 让位，然后刷新
+            newSW.postMessage('skipWaiting');
+            // 短暂延迟后刷新，让新 SW 接管
+            setTimeout(() => { window.location.reload(); }, 300);
+          }
+        });
+      });
+    });
+    // 定期检查更新（每30分钟）
+    setInterval(() => { navigator.serviceWorker.getRegistration().then(r => r && r.update()); }, 1800000);
   }
 </script>
 </body>

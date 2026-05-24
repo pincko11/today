@@ -711,11 +711,13 @@
       `;
       row.addEventListener('click', function(e) {
         if (e.target.closest('.task-delete')) return;
-        task.done = !task.done;
+        if (task.done) return; // 已完成不可取消，只能删除
+        task.done = true;
         saveData(data);
         renderTasks();
         updateStreak();
-        if (task.done) { checkAllDone(); addXP(10); }
+        addXP(10);
+        checkAllDone();
       });
       row.querySelector('.task-delete').addEventListener('click', function(e) {
         e.stopPropagation();

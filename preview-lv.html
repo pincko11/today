@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>等级系统预览</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    background: #faf8fd;
+    display: flex; justify-content: center; padding: 20px 16px;
+    min-height: 100vh;
+  }
+  .container { width: 100%; max-width: 440px; }
+
+  .main-card-preview {
+    background: #fff; border-radius: 24px; padding: 40px 22px;
+    text-align: center; color: #8b80a8; font-size: 14px;
+    box-shadow: 0 4px 20px rgba(45,38,64,0.06);
+    margin-bottom: 16px;
+  }
+
+  /* ====== 等级卡片 ====== */
+  .lv-card {
+    background: #fff;
+    border-radius: 20px;
+    padding: 14px 18px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    box-shadow: 0 4px 20px rgba(45,38,64,0.06), 0 1px 3px rgba(45,38,64,0.04);
+    position: relative;
+    overflow: hidden;
+  }
+  .lv-card::before {
+    content: '';
+    position: absolute;
+    top: -30px; right: -30px;
+    width: 120px; height: 120px;
+    background: radial-gradient(circle, rgba(108,93,167,0.04) 0%, transparent 70%);
+    border-radius: 50%;
+    pointer-events: none;
+  }
+
+  /* 头像——自然融合边框 */
+  .lv-avatar-ring {
+    position: relative;
+    flex-shrink: 0;
+    padding: 3px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #c8b8e0 0%, #e8d8f0 30%, #d0c0e8 70%, #c0a8d8 100%);
+    box-shadow: 0 2px 10px rgba(108,93,167,0.10);
+    cursor: pointer;
+    transition: transform 0.3s ease;
+  }
+  .lv-avatar-ring:hover { transform: scale(1.06); }
+  .lv-avatar-ring::before {
+    content: '✏️';
+    position: absolute;
+    bottom: 2px; right: 2px;
+    font-size: 12px;
+    z-index: 2;
+    opacity: 0;
+    transition: opacity 0.2s;
+    pointer-events: none;
+    background: rgba(255,255,255,0.85);
+    border-radius: 50%;
+    width: 20px; height: 20px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .lv-avatar-ring:hover::before { opacity: 0.85; }
+  .lv-avatar {
+    width: 54px; height: 54px;
+    border-radius: 50%;
+    object-fit: cover;
+    display: block;
+    border: 2px solid #fff;
+    background: #f0ecf6;
+  }
+
+  /* 右侧信息区 */
+  .lv-info { flex: 1; min-width: 0; position: relative; z-index: 1; }
+
+  /* 称谓 */
+  .lv-title {
+    font-size: 13px; font-weight: 700; color: #6c5da7;
+    margin-bottom: 2px;
+    letter-spacing: 0.5px;
+  }
+
+  /* Lv.X */
+  .lv-number {
+    font-size: 16px; font-weight: 800; color: #4a3d72;
+    line-height: 1; margin-bottom: 6px;
+  }
+
+  /* 经验条轨道 */
+  .xp-track {
+    width: 100%; height: 22px;
+    background: #ece6f4;
+    border-radius: 11px;
+    overflow: hidden;
+    position: relative;
+  }
+  .xp-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #f8c8d8 0%, #f4a0b8 50%, #f080a8 100%);
+    border-radius: 11px;
+    transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+    position: absolute; left: 0; top: 0;
+  }
+  .xp-fill::after {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0;
+    height: 35%;
+    background: rgba(255,255,255,0.20);
+    border-radius: 11px 11px 0 0;
+  }
+  /* XP 文字叠在经验条内右端 */
+  .xp-text {
+    position: absolute; right: 10px; top: 50%;
+    transform: translateY(-50%);
+    font-size: 11px; font-weight: 700; color: #4a3d72;
+    z-index: 2; white-space: nowrap;
+    pointer-events: none;
+  }
+
+  /* ====== 升级弹窗 — 液态玻璃粉黄调 ====== */
+  .levelup-overlay {
+    position: fixed; inset: 0;
+    background: transparent;
+    z-index: 999;
+    display: flex; align-items: center; justify-content: center;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.35s ease;
+  }
+  .levelup-overlay.show { opacity: 1; }
+
+  .levelup-popup {
+    background: linear-gradient(160deg,
+      rgba(255,240,180,0.28) 0%,
+      rgba(255,225,140,0.22) 40%,
+      rgba(255,200,170,0.25) 100%);
+    backdrop-filter: blur(20px) saturate(1.6);
+    -webkit-backdrop-filter: blur(20px) saturate(1.6);
+    color: #4a2500;
+    padding: 28px 34px;
+    border-radius: 24px;
+    text-align: center;
+    box-shadow:
+      0 12px 40px rgba(180,140,60,0.18),
+      inset 0 1px 0 rgba(255,255,255,0.35);
+    animation: levelup-bounce 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);
+    border: 1px solid rgba(255,200,120,0.40);
+  }
+  @keyframes levelup-bounce {
+    0% { transform: scale(0.3); opacity: 0; }
+    50% { transform: scale(1.15); }
+    100% { transform: scale(1); opacity: 1; }
+  }
+  .levelup-popup .lv-top-text {
+    font-size: 15px; font-weight: 700; color: #c05030;
+    margin-bottom: 10px;
+    text-shadow: 0 1px 0 rgba(255,255,255,0.4);
+  }
+  .levelup-popup .lv-center {
+    font-size: 22px; font-weight: 800; color: #a85800;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    text-shadow: 0 1px 0 rgba(255,255,255,0.4);
+  }
+  .levelup-popup .lv-center .big-arrow { font-size: 32px; line-height: 1; }
+
+  /* ====== 称号解锁弹窗 — 液态玻璃蓝黄调 ====== */
+  .title-overlay {
+    position: fixed; inset: 0;
+    background: transparent;
+    z-index: 1000;
+    display: flex; align-items: center; justify-content: center;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.35s ease;
+  }
+  .title-overlay.show { opacity: 1; }
+
+  .title-popup {
+    background: linear-gradient(160deg,
+      rgba(200,215,255,0.28) 0%,
+      rgba(180,200,250,0.22) 40%,
+      rgba(245,230,185,0.22) 100%);
+    backdrop-filter: blur(20px) saturate(1.6);
+    -webkit-backdrop-filter: blur(20px) saturate(1.6);
+    color: #1a1040;
+    padding: 30px 32px;
+    border-radius: 24px;
+    text-align: center;
+    box-shadow:
+      0 12px 40px rgba(60,80,180,0.18),
+      inset 0 1px 0 rgba(255,255,255,0.35);
+    animation: title-bounce 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);
+    border: 1px solid rgba(140,170,240,0.40);
+    max-width: 280px;
+  }
+  @keyframes title-bounce {
+    0% { transform: scale(0.3) rotate(-5deg); opacity: 0; }
+    60% { transform: scale(1.12) rotate(2deg); }
+    100% { transform: scale(1) rotate(0deg); opacity: 1; }
+  }
+  .title-popup .title-star { font-size: 36px; }
+  .title-popup .title-congrats {
+    font-size: 15px; font-weight: 700; color: #3a2a6a;
+    margin: 6px 0;
+    text-shadow: 0 1px 0 rgba(255,255,255,0.4);
+  }
+  .title-popup .title-name {
+    font-size: 24px; font-weight: 900;
+    background: linear-gradient(135deg, #4a2e80, #3058a0);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin: 4px 0;
+  }
+
+  /* 粒子 */
+  .spark {
+    position: fixed; pointer-events: none; z-index: 998;
+    width: 6px; height: 6px; border-radius: 50%;
+    animation: spark-fly 1.2s ease-out forwards;
+  }
+  @keyframes spark-fly {
+    0% { transform: translate(0,0) scale(1); opacity: 1; }
+    100% { transform: translate(var(--dx), var(--dy)) scale(0); opacity: 0; }
+  }
+
+  @keyframes popup-confetti {
+    0% { transform: translate(0,0) scale(1) rotate(0deg); opacity: 1; }
+    60% { opacity: 0.9; }
+    100% { transform: translate(var(--dx), var(--dy)) scale(0.2) rotate(540deg); opacity: 0; }
+  }
+
+  /* 按钮 */
+  .demo-btns {
+    display: flex; gap: 10px; margin-top: 16px; justify-content: center; flex-wrap: wrap;
+  }
+  .demo-btns button {
+    padding: 10px 18px; border: none; border-radius: 14px;
+    font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;
+    transition: all 0.2s;
+  }
+  .btn-add { background: #6c5da7; color: #fff; }
+  .btn-add:hover { background: #584b8a; }
+  .btn-lose { background: #f0e0e0; color: #c55; }
+  .btn-lose:hover { background: #e8d0d0; }
+  .btn-reset { background: #ece6f4; color: #6c5da7; }
+  .btn-reset:hover { background: #ddd4ec; }
+  .btn-jump { background: #4db87a; color: #fff; }
+  .btn-jump:hover { background: #3da06a; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="main-card-preview">📋 夸夸卡片区域（任务列表）</div>
+
+  <!-- 等级卡片 -->
+  <div class="lv-card" id="lvCard">
+    <div class="lv-avatar-ring">
+      <img class="lv-avatar" id="lvAvatarImg" src="avatar-lv.jpg" alt="点击换头像 | 长按管理"
+           title="点击换头像 | 长按/右键管理"
+           style="cursor:pointer;"
+           onerror="this.style.background='#e0d8f0'">
+    </div>
+    <div class="lv-info">
+      <div class="lv-title" id="lvTitle">执行者</div>
+      <div class="lv-number" id="lvNumber">Lv.1</div>
+      <div class="xp-track">
+        <div class="xp-fill" id="xpFill" style="width:0%;"></div>
+        <span class="xp-text" id="xpText">0/100</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="demo-btns">
+    <button class="btn-add" onclick="addXP(10)">+10 XP（打勾任务）</button>
+    <button class="btn-lose" onclick="addXP(-20)">-20 XP（昨日未完成）</button>
+    <button class="btn-jump" onclick="jumpTo(19)">跳到 Lv.19</button>
+    <button class="btn-jump" onclick="jumpTo(39)">跳到 Lv.39</button>
+    <button class="btn-jump" onclick="jumpTo(99)">跳到 Lv.99</button>
+    <button class="btn-reset" onclick="resetAll()">重置</button>
+  </div>
+
+  <!-- 升级弹窗 -->
+  <div class="levelup-overlay" id="levelupOverlay">
+    <div class="levelup-popup">
+      <div class="lv-top-text">😲！升级了！执行力好强！</div>
+      <div class="lv-center">
+        <span id="lvNewLevel">Lv.2</span>
+        <span class="big-arrow">⬆</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 称号解锁弹窗 -->
+  <div class="title-overlay" id="titleOverlay">
+    <div class="title-popup">
+      <div class="title-star">🎉</div>
+      <div class="title-congrats">恭喜你，领域展开，成为</div>
+      <div class="title-name" id="titleName">执行者</div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let xp = 0;
+  let level = 1;
+  const XP_PER_LV = 100;
+  const MAX_LV = 200;
+
+  // 称号表
+  const TITLES = [
+    { min: 1,   max: 19,  name: '执行者' },
+    { min: 20,  max: 39,  name: '执行果断家' },
+    { min: 40,  max: 59,  name: '执行统帅' },
+    { min: 60,  max: 79,  name: '执行恐怖王' },
+    { min: 80,  max: 99,  name: '执行星际指挥官' },
+    { min: 100, max: 149, name: '执行宇宙统治' },
+    { min: 150, max: 200, name: '执行万物本体' }
+  ];
+
+  function getTitle(lv) {
+    for (const t of TITLES) {
+      if (lv >= t.min && lv <= t.max) return t;
+    }
+    return TITLES[TITLES.length - 1];
+  }
+
+  // 记录已解锁过的称号
+  let unlockedTitles = JSON.parse(localStorage.getItem('lv_unlocked_titles') || '[]');
+
+  function updateUI() {
+    const xpInLevel = xp % XP_PER_LV;
+    const pct = level >= MAX_LV ? 100 : (xpInLevel / XP_PER_LV) * 100;
+    const title = getTitle(level);
+
+    document.getElementById('lvTitle').textContent = title.name;
+    document.getElementById('lvNumber').textContent = 'Lv.' + level;
+    document.getElementById('xpFill').style.width = pct + '%';
+
+    if (level >= MAX_LV) {
+      document.getElementById('xpText').textContent = 'MAX';
+    } else {
+      document.getElementById('xpText').textContent = xpInLevel + '/' + XP_PER_LV;
+    }
+
+    // 调整文字颜色：填充超过文字位置时用白色
+    const xpText = document.getElementById('xpText');
+    if (pct > 78) {
+      xpText.style.color = '#fff';
+      xpText.style.textShadow = '0 1px 2px rgba(0,0,0,0.15)';
+    } else {
+      xpText.style.color = '#4a3d72';
+      xpText.style.textShadow = 'none';
+    }
+  }
+
+  function addXP(amount) {
+    if (level >= MAX_LV && amount > 0) return;
+
+    const oldTitle = getTitle(level).name;
+    const oldLevel = level;
+
+    xp += amount;
+    if (xp < 0) xp = 0;
+    level = Math.min(Math.floor(xp / XP_PER_LV) + 1, MAX_LV);
+
+    const newTitle = getTitle(level).name;
+
+    // 称号变了（只显示称号弹窗，不显示升级弹窗）
+    if (newTitle !== oldTitle && !unlockedTitles.includes(newTitle)) {
+      unlockedTitles.push(newTitle);
+      localStorage.setItem('lv_unlocked_titles', JSON.stringify(unlockedTitles));
+      spawnSparks();
+      setTimeout(() => showTitleUnlock(newTitle), 200);
+    } else if (level > oldLevel) {
+      // 没有称号变化，只出升级弹窗
+      spawnSparks();
+      setTimeout(() => showLevelUp(), 250);
+    }
+
+    updateUI();
+  }
+
+  function jumpTo(targetLv) {
+    xp = (targetLv - 1) * XP_PER_LV;
+    const oldTitle = getTitle(level).name;
+    const oldLevel = level;
+    level = targetLv;
+    const newTitle = getTitle(level).name;
+
+    updateUI();
+
+    if (newTitle !== oldTitle && !unlockedTitles.includes(newTitle)) {
+      unlockedTitles.push(newTitle);
+      localStorage.setItem('lv_unlocked_titles', JSON.stringify(unlockedTitles));
+      spawnSparks();
+      setTimeout(() => showTitleUnlock(newTitle), 200);
+    } else if (level > oldLevel) {
+      spawnSparks();
+      setTimeout(() => showLevelUp(), 250);
+    }
+  }
+
+  function resetAll() {
+    xp = 0; level = 1;
+    unlockedTitles = ['执行者'];
+    localStorage.setItem('lv_unlocked_titles', JSON.stringify(unlockedTitles));
+    updateUI();
+  }
+
+  function showTitleUnlock(title) {
+    const overlay = document.getElementById('titleOverlay');
+    document.getElementById('titleName').textContent = title;
+    overlay.classList.add('show');
+    spawnPopupConfetti(overlay);
+    setTimeout(() => overlay.classList.remove('show'), 2800);
+  }
+  function showLevelUp() {
+    document.getElementById('lvNewLevel').textContent = 'Lv.' + level;
+    const overlay = document.getElementById('levelupOverlay');
+    overlay.classList.add('show');
+    spawnPopupConfetti(overlay);
+    const card = document.getElementById('lvCard');
+    card.style.animation = 'none'; card.offsetHeight;
+    card.style.animation = 'levelup-bounce 0.5s ease';
+    setTimeout(() => overlay.classList.remove('show'), 2200);
+  }
+
+  function spawnPopupConfetti(overlay) {
+    const popup = overlay.firstElementChild;
+    const popupRect = popup.getBoundingClientRect();
+    const cx = popupRect.left + popupRect.width / 2;
+    const cy = popupRect.top + popupRect.height / 2;
+    const colors = ['#f0a0b8','#6c5da7','#f7d794','#4db87a','#f19066',
+                    '#ffd700','#ff9ff3','#54a0ff','#5f27cd','#ff6348',
+                    '#feca57','#00d2d3','#ff6b6b','#c8d6e5','#f368e0'];
+
+    const frag = document.createDocumentFragment();
+    for (let i = 0; i < 50; i++) {
+      const c = document.createElement('div');
+      c.style.cssText = `
+        position: fixed; z-index: 1001; pointer-events: none;
+        left: ${cx}px; top: ${cy}px;
+        width: ${5 + Math.random() * 8}px;
+        height: ${5 + Math.random() * 8}px;
+        border-radius: ${Math.random() > 0.5 ? '50%' : '2px'};
+        background: ${colors[Math.floor(Math.random() * colors.length)]};
+        animation: popup-confetti ${1 + Math.random() * 1.5}s ease-out ${Math.random() * 0.3}s forwards;
+      `;
+      c.style.setProperty('--dx', (Math.random() - 0.5) * 220 + 'px');
+      c.style.setProperty('--dy', (Math.random() - 0.5) * 240 - 60 + 'px');
+      c.addEventListener('animationend', () => c.remove());
+      frag.appendChild(c);
+    }
+    document.body.appendChild(frag);
+  }
+
+  function spawnSparks() {
+    const card = document.getElementById('lvCard');
+    const rect = card.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const colors = ['#f0a0b8','#6c5da7','#f7d794','#4db87a','#f19066',
+                    '#778beb','#e77f67','#cf6a87','#63cdda','#ffd700'];
+
+    for (let i = 0; i < 28; i++) {
+      const spark = document.createElement('div');
+      spark.className = 'spark';
+      spark.style.left = cx + 'px';
+      spark.style.top = cy + 'px';
+      spark.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+      spark.style.width = (4 + Math.random() * 7) + 'px';
+      spark.style.height = (4 + Math.random() * 7) + 'px';
+      spark.style.setProperty('--dx', (Math.random() - 0.5) * 180 + 'px');
+      spark.style.setProperty('--dy', (Math.random() - 0.5) * 180 + 'px');
+      spark.style.animationDuration = (0.8 + Math.random() * 1) + 's';
+      spark.addEventListener('animationend', () => spark.remove());
+      document.body.appendChild(spark);
+    }
+  }
+
+  // ── 头像更换 + 历史管理 ──
+  const lvAvatarImg = document.getElementById('lvAvatarImg');
+  const fileInput = document.createElement('input');
+  fileInput.type = 'file';
+  fileInput.accept = 'image/*';
+  fileInput.style.display = 'none';
+  document.body.appendChild(fileInput);
+
+  // 头像历史数组 [{base64, time}]
+  let avatarHistory = [];
+  try { avatarHistory = JSON.parse(localStorage.getItem('lv_avatar_history') || '[]'); } catch(e) {}
+
+  // 加载当前头像
+  const currentAvatar = localStorage.getItem('lv_custom_avatar');
+  if (currentAvatar) {
+    lvAvatarImg.src = currentAvatar;
+  }
+
+  lvAvatarImg.addEventListener('click', () => fileInput.click());
+
+  fileInput.addEventListener('change', function() {
+    const file = this.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const base64 = e.target.result;
+      // 保存当前
+      lvAvatarImg.src = base64;
+      localStorage.setItem('lv_custom_avatar', base64);
+      // 加入历史
+      avatarHistory.unshift({ base64: base64, time: Date.now() });
+      if (avatarHistory.length > 10) avatarHistory.pop(); // 最多10条
+      saveHistory();
+    };
+    reader.readAsDataURL(file);
+  });
+
+  function saveHistory() {
+    localStorage.setItem('lv_avatar_history', JSON.stringify(avatarHistory));
+  }
+
+  // ── 头像管理面板 ──
+  const mgmtPanel = document.createElement('div');
+  mgmtPanel.style.cssText = `
+    position: fixed; inset: 0; z-index: 2000;
+    background: rgba(0,0,0,0.4); backdrop-filter: blur(4px);
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none; transition: opacity 0.3s;
+  `;
+  mgmtPanel.innerHTML = `
+    <div style="background:#fff;border-radius:20px;padding:22px;width:90%;max-width:320px;max-height:70vh;overflow-y:auto;text-align:center;">
+      <h3 style="font-size:16px;font-weight:700;color:#2d2640;margin-bottom:4px;">头像管理</h3>
+      <p style="font-size:11px;color:#8b80a8;margin-bottom:12px;">删除后彻底清除，不留痕迹</p>
+      <div id="avatarHistoryList" style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center;"></div>
+      <button id="closeMgmt" style="margin-top:14px;padding:10px 28px;background:#6c5da7;color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;">关闭</button>
+    </div>
+  `;
+  document.body.appendChild(mgmtPanel);
+
+  function renderHistory() {
+    const list = document.getElementById('avatarHistoryList');
+    list.innerHTML = '';
+    if (avatarHistory.length === 0) {
+      list.innerHTML = '<p style="font-size:12px;color:#bfb8d0;">暂无历史记录</p>';
+      return;
+    }
+    avatarHistory.forEach((item, i) => {
+      const wrap = document.createElement('div');
+      wrap.style.cssText = 'position:relative;';
+      const img = document.createElement('img');
+      img.src = item.base64;
+      img.style.cssText = 'width:54px;height:54px;border-radius:50%;object-fit:cover;border:2px solid #e8e0f0;';
+      img.title = new Date(item.time).toLocaleString();
+      // 点击还原
+      img.addEventListener('click', () => {
+        lvAvatarImg.src = item.base64;
+        localStorage.setItem('lv_custom_avatar', item.base64);
+        mgmtPanel.style.opacity = '0'; mgmtPanel.style.pointerEvents = 'none';
+      });
+      const del = document.createElement('button');
+      del.textContent = '×';
+      del.style.cssText = 'position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#e06868;color:#fff;border:none;font-size:12px;cursor:pointer;line-height:1;';
+      del.addEventListener('click', (e) => {
+        e.stopPropagation();
+        // 如果删的是当前使用的，还原默认
+        if (lvAvatarImg.src === item.base64) {
+          lvAvatarImg.src = 'avatar-lv.jpg';
+          localStorage.removeItem('lv_custom_avatar');
+        }
+        avatarHistory.splice(i, 1);
+        saveHistory();
+        renderHistory();
+      });
+      wrap.appendChild(img);
+      wrap.appendChild(del);
+      list.appendChild(wrap);
+    });
+  }
+
+  // 长按头像打开管理面板
+  let longPressTimer;
+  lvAvatarImg.addEventListener('touchstart', function(e) {
+    longPressTimer = setTimeout(() => {
+      e.preventDefault();
+      renderHistory();
+      mgmtPanel.style.opacity = '1'; mgmtPanel.style.pointerEvents = 'auto';
+    }, 600);
+  });
+  lvAvatarImg.addEventListener('touchend', () => clearTimeout(longPressTimer));
+  lvAvatarImg.addEventListener('touchmove', () => clearTimeout(longPressTimer));
+  // 桌面端右键打开
+  lvAvatarImg.addEventListener('contextmenu', function(e) {
+    e.preventDefault();
+    renderHistory();
+    mgmtPanel.style.opacity = '1'; mgmtPanel.style.pointerEvents = 'auto';
+  });
+
+  document.getElementById('closeMgmt').addEventListener('click', () => {
+    mgmtPanel.style.opacity = '0'; mgmtPanel.style.pointerEvents = 'none';
+  });
+  mgmtPanel.addEventListener('click', function(e) {
+    if (e.target === mgmtPanel) {
+      mgmtPanel.style.opacity = '0'; mgmtPanel.style.pointerEvents = 'none';
+    }
+  });
+
+  // ── 初始化——首个称号自动解锁
+  if (!unlockedTitles.includes('执行者')) {
+    unlockedTitles.push('执行者');
+    localStorage.setItem('lv_unlocked_titles', JSON.stringify(unlockedTitles));
+  }
+
+  updateUI();
+</script>
+</body>
+</html>

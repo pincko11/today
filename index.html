@@ -639,10 +639,23 @@
            String(d.getDate()).padStart(2, '0');
   }
   function loadData() {
-    try { return JSON.parse(localStorage.getItem('daily3_data')) || {}; }
-    catch (e) { return {}; }
+    try {
+      const raw = localStorage.getItem('daily3_data');
+      if (raw) return JSON.parse(raw);
+      const bak = localStorage.getItem('daily3_data_backup');
+      if (bak) { localStorage.setItem('daily3_data', bak); return JSON.parse(bak); }
+      return {};
+    } catch (e) {
+      const bak = localStorage.getItem('daily3_data_backup');
+      if (bak) { try { localStorage.setItem('daily3_data', bak); return JSON.parse(bak); } catch(e2) {} }
+      return {};
+    }
   }
-  function saveData(data) { localStorage.setItem('daily3_data', JSON.stringify(data)); }
+  function saveData(data) {
+    const json = JSON.stringify(data);
+    localStorage.setItem('daily3_data', json);
+    localStorage.setItem('daily3_data_backup', json);
+  }
 
   function calcStreak(data) {
     let streak = 0; const d = new Date(); const tk = todayKey();
@@ -1123,7 +1136,14 @@
   ];
   function getTitle(lv) { for (const t of TITLES) { if (lv>=t.min&&lv<=t.max) return t; } return TITLES[TITLES.length-1]; }
 
-  let lvXp = parseInt(localStorage.getItem('lv_xp')||'0');
+  function loadWithBackup(key, backupKey, fallback) {
+    const v = localStorage.getItem(key);
+    if (v !== null) return v;
+    const b = localStorage.getItem(backupKey);
+    if (b !== null) { localStorage.setItem(key, b); return b; }
+    return fallback;
+  }
+  let lvXp = parseInt(loadWithBackup('lv_xp', 'lv_xp_backup', '0'));
   let lvLevel = getLevelFromXp(lvXp);
   let unlockedTitles = JSON.parse(localStorage.getItem('lv_unlocked_titles')||'[]');
   if (!unlockedTitles.includes('执行者')) { unlockedTitles.push('执行者'); localStorage.setItem('lv_unlocked_titles',JSON.stringify(unlockedTitles)); }
@@ -1147,7 +1167,7 @@
     const oldTitle=getTitle(lvLevel).name, oldLevel=lvLevel;
     lvXp+=amount; if (lvXp<0) lvXp=0;
     lvLevel=getLevelFromXp(lvXp);
-    localStorage.setItem('lv_xp',lvXp);
+    localStorage.setItem('lv_xp',lvXp); localStorage.setItem('lv_xp_backup',lvXp);
     const newTitle=getTitle(lvLevel).name;
     if (newTitle!==oldTitle&&!unlockedTitles.includes(newTitle)) {
       unlockedTitles.push(newTitle); localStorage.setItem('lv_unlocked_titles',JSON.stringify(unlockedTitles));

@@ -92,7 +92,7 @@
   /* 语录闪烁光晕 */
   .avatar.quote-active,
   .avatar.voice-active {
-    animation: avatar-quote-glow 0.5s ease-in-out 3;
+    animation: avatar-quote-glow 0.5s ease-in-out infinite;
   }
   @keyframes avatar-quote-glow {
     0%, 100% { box-shadow: 0 2px 12px rgba(45,38,64,0.10), 0 0 0 4px rgba(108,93,167,0.08); }
@@ -953,6 +953,7 @@
   let voiceConfig = {};
   let currentAudio = null;
   let currentLineTimer = null;
+  let currentVoiceAvatar = null;
 
   fetch('voices_config.json')
     .then(r => r.json())
@@ -966,8 +967,19 @@
   }
 
   function stopCurrentVoice() {
-    if (currentAudio) { currentAudio.pause(); currentAudio.currentTime = 0; currentAudio = null; }
+    if (currentAudio) {
+      currentAudio.onloadedmetadata = null;
+      currentAudio.onended = null;
+      currentAudio.onerror = null;
+      currentAudio.pause();
+      currentAudio.currentTime = 0;
+      currentAudio = null;
+    }
     clearTimeout(currentLineTimer);
+    if (currentVoiceAvatar) {
+      currentVoiceAvatar.classList.remove('voice-active');
+      currentVoiceAvatar = null;
+    }
     quoteLine.classList.remove('show');
   }
 
@@ -985,10 +997,18 @@
     showNext();
   }
 
-  function onVoiceEnd(avatar) {
-    avatar.classList.remove('voice-active');
+  function onVoiceEnd() {
+    if (currentVoiceAvatar) {
+      currentVoiceAvatar.classList.remove('voice-active');
+      currentVoiceAvatar = null;
+    }
     quoteLine.classList.remove('show');
-    currentAudio = null;
+    if (currentAudio) {
+      currentAudio.onloadedmetadata = null;
+      currentAudio.onended = null;
+      currentAudio.onerror = null;
+      currentAudio = null;
+    }
     clearTimeout(currentLineTimer);
   }
 
@@ -1006,18 +1026,17 @@
         stopCurrentVoice();
         quoteLine.textContent = '夏以昼正在路上，敬请期待 ✨';
         quoteLine.classList.add('show');
+        currentVoiceAvatar = avatar;
         avatar.classList.add('voice-active');
-        setTimeout(() => { avatar.classList.remove('voice-active'); quoteLine.classList.remove('show'); }, 2000);
+        setTimeout(() => { avatar.classList.remove('voice-active'); currentVoiceAvatar = null; quoteLine.classList.remove('show'); }, 2000);
         return;
       }
 
       stopCurrentVoice();
-      document.querySelectorAll('.avatar').forEach(a => a.classList.remove('voice-active'));
-
-      const seg = segments[Math.floor(Math.random() * segments.length)];
-      const audioPath = 'output/' + charKey + '/' + seg.file;
+      currentVoiceAvatar = avatar;
       avatar.classList.add('voice-active');
-      currentAudio = new Audio(audioPath);
+      const seg = segments[Math.floor(Math.random() * segments.length)];
+      currentAudio = new Audio('output/' + charKey + '/' + seg.file);
       const lines = splitTextToLines(seg.text);
 
       currentAudio.addEventListener('loadedmetadata', () => {
@@ -1025,14 +1044,14 @@
         if (dur && isFinite(dur)) displayLines(lines, dur);
         else { quoteLine.textContent = seg.text; quoteLine.classList.add('show'); }
       });
-      currentAudio.addEventListener('ended', () => onVoiceEnd(avatar));
+      currentAudio.addEventListener('ended', () => onVoiceEnd());
       currentAudio.addEventListener('error', () => {
         quoteLine.textContent = seg.text; quoteLine.classList.add('show');
-        setTimeout(() => onVoiceEnd(avatar), 3000);
+        setTimeout(() => onVoiceEnd(), 3000);
       });
       currentAudio.play().catch(() => {
         quoteLine.textContent = seg.text; quoteLine.classList.add('show');
-        setTimeout(() => onVoiceEnd(avatar), 3000);
+        setTimeout(() => onVoiceEnd(), 3000);
       });
     });
   });

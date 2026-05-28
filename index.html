@@ -90,7 +90,8 @@
   }
 
   /* 语录闪烁光晕 */
-  .avatar.quote-active {
+  .avatar.quote-active,
+  .avatar.voice-active {
     animation: avatar-quote-glow 0.5s ease-in-out 3;
   }
   @keyframes avatar-quote-glow {
@@ -104,18 +105,39 @@
     text-align: center; white-space: nowrap;
   }
 
-  /* 语录行——头像和标题之间，正常流式，不遮挡 */
+  /* 语音文本显示框 */
   .quote-line {
     text-align: center;
     font-size: 13px; font-weight: 500;
     color: var(--purple);
-    min-height: 22px;
-    line-height: 1.5;
-    padding: 0 8px;
+    min-height: 30px;
+    line-height: 1.6;
+    padding: 6px 16px;
     margin-bottom: 2px;
     opacity: 0;
     transition: opacity 0.35s ease;
+    background: rgba(255,255,255,0.55);
+    border-radius: 14px;
+    border: 1px solid rgba(108,93,167,0.12);
+    box-shadow: 0 1px 4px rgba(108,93,167,0.06);
+    position: relative;
   }
+  .quote-line::before,
+  .quote-line::after {
+    content: '◆';
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 6px;
+    color: rgba(108,93,167,0.25);
+    opacity: 0;
+    transition: opacity 0.35s ease;
+  }
+  .quote-line::before { left: 8px; }
+  .quote-line::after  { right: 8px; }
+  .quote-line.show { opacity: 1; }
+  .quote-line.show::before,
+  .quote-line.show::after { opacity: 1; }
 
   header h1 {
     font-size: 28px; font-weight: 700; letter-spacing: -0.3px;
@@ -270,9 +292,7 @@
   .task-delete:hover { background: rgba(224,104,104,0.20); color: var(--red); }
 
   /* 添加任务 */
-  .add-task {
-    display: flex; gap: 8px; margin-top: 10px;
-  }
+  .add-task { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
   .add-task input {
     flex: 1;
     border: 2px dashed #d8d2e8;
@@ -299,7 +319,17 @@
     white-space: nowrap; font-family: inherit;
   }
   .add-task button:hover { background: var(--purple-dark); }
+  .add-task-row { display: flex; gap: 8px; }
   .add-task button:active { transform: scale(0.95); }
+
+  .task-mode { display: flex; gap: 0; margin-bottom: 8px; background: #ece6f4; border-radius: 10px; padding: 3px; }
+  .task-mode .mode-btn { flex: 1; padding: 6px 10px; border: none; background: transparent; color: #8b80a8; font-size: 13px; font-weight: 600; border-radius: 8px; cursor: pointer; transition: all 0.2s; font-family: inherit; }
+  .task-mode .mode-btn.active { background: #fff; color: #6c5da7; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  .future-preview { margin-top: 8px; padding: 10px 12px; background: rgba(108,93,167,0.06); border-radius: 10px; }
+  .future-label { font-size: 11px; color: #8b80a8; font-weight: 500; margin-bottom: 4px; }
+  .future-item { display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: #2d2640; padding: 4px 0; }
+  .future-item .future-del { color: #bfb8d0; cursor: pointer; font-size: 16px; transition: color 0.2s; }
+  .future-item .future-del:hover { color: #e06868; }
 
   .empty-hint {
     text-align: center; color: #2d2240; font-weight: 450;
@@ -527,8 +557,18 @@
       </div>
       <div id="taskList"></div>
       <div class="add-task" id="addTaskRow" style="display:none;">
-        <input type="text" id="taskInput" placeholder="今天最重要的一件事是..." maxlength="60">
-        <button id="addBtn">＋ 添加</button>
+        <div class="task-mode" id="taskMode">
+          <button class="mode-btn active" data-mode="today">今天</button>
+          <button class="mode-btn" data-mode="tomorrow">明天</button>
+        </div>
+        <div class="add-task-row">
+          <input type="text" id="taskInput" placeholder="今天最重要的一件事是..." maxlength="60">
+          <button id="addBtn">＋ 添加</button>
+        </div>
+        <div class="future-preview" id="futurePreview" style="display:none;">
+          <div class="future-label"></div>
+          <div id="futureList"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -658,17 +698,12 @@
   }
 
   function calcStreak(data) {
-    let streak = 0; const d = new Date(); const tk = todayKey();
-    while (true) {
-      const key = d.getFullYear() + '-' +
-                  String(d.getMonth() + 1).padStart(2, '0') + '-' +
-                  String(d.getDate()).padStart(2, '0');
+    let streak = 0;
+    for (const key of Object.keys(data)) {
       const tasks = data[key];
-      if (!tasks || tasks.length === 0) break;
-      if (key === tk) { streak++; break; }
-      if (!tasks.every(t => t.done)) break;
-      streak++;
-      d.setDate(d.getDate() - 1);
+      if (tasks && tasks.length > 0 && tasks.every(t => t.done)) {
+        streak++;
+      }
     }
     return streak;
   }
@@ -689,10 +724,10 @@
     const msg = document.getElementById('streakMessage');
     if (s === 0) msg.innerHTML = '<span class="emoji">🌱</span> 今天开始你的第一次打卡！';
     else if (s < 3) msg.innerHTML = '<span class="emoji">💪</span> 好的开始！继续保持';
-    else if (s < 7) msg.innerHTML = '<span class="emoji">🔥</span> 连续' + s + '天，渐入佳境';
+    else if (s < 7) msg.innerHTML = '<span class="emoji">🔥</span> 累计' + s + '天，渐入佳境';
     else if (s < 14) msg.innerHTML = '<span class="emoji">⭐</span> 一周以上了，你认真的！';
-    else if (s < 30) msg.innerHTML = '<span class="emoji">🏆</span> 连续' + s + '天，已成本能';
-    else msg.innerHTML = '<span class="emoji">👑</span> 连续' + s + '天！拖延症已被击败';
+    else if (s < 30) msg.innerHTML = '<span class="emoji">🏆</span> 累计' + s + '天，已成本能';
+    else msg.innerHTML = '<span class="emoji">👑</span> 累计' + s + '天！拖延症已被击败';
   }
   updateStreak();
 
@@ -757,10 +792,96 @@
   document.getElementById('taskInput').addEventListener('keydown', function(e) {
     if (e.key === 'Enter') addTask();
   });
+
+  /* ── 预设待办：今天/明天 切换 ── */
+  let taskMode = 'today';
+  document.querySelectorAll('.task-mode .mode-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.task-mode .mode-btn').forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      taskMode = this.dataset.mode;
+      const input = document.getElementById('taskInput');
+      if (taskMode === 'tomorrow') {
+        input.placeholder = '提前写下明天要做的事...';
+        renderFuturePreview();
+      } else {
+        input.placeholder = '今天最重要的一件事是...';
+        document.getElementById('futurePreview').style.display = 'none';
+      }
+    });
+  });
+
+  function loadFutureTasks() {
+    const raw = localStorage.getItem('daily3_future');
+    if (!raw) return;
+    let future;
+    try { future = JSON.parse(raw); } catch(e) { return; }
+    const today = todayKey();
+    const todays = future.filter(f => f.date === today);
+    const remaining = future.filter(f => f.date !== today);
+    let changed = false;
+    todays.forEach(f => {
+      if (data[today].length < 3) {
+        data[today].push({ text: f.text, done: false });
+        changed = true;
+      } else {
+        remaining.push(f);
+      }
+    });
+    if (changed) { saveData(data); renderTasks(); updateStreak(); }
+    localStorage.setItem('daily3_future', JSON.stringify(remaining));
+  }
+
+  function renderFuturePreview() {
+    const raw = localStorage.getItem('daily3_future');
+    let future = [];
+    try { if (raw) future = JSON.parse(raw); } catch(e) {}
+    const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+    const tKey = tomorrow.getFullYear() + '-' + String(tomorrow.getMonth()+1).padStart(2,'0') + '-' + String(tomorrow.getDate()).padStart(2,'0');
+    const list = future.filter(f => f.date === tKey);
+    const preview = document.getElementById('futurePreview');
+    const label = preview.querySelector('.future-label');
+    const container = document.getElementById('futureList');
+    if (list.length === 0) {
+      label.textContent = '📌 明天还没有预设待办';
+      container.innerHTML = '';
+      preview.style.display = 'block';
+    } else {
+      label.textContent = '📌 明天待办（' + list.length + '）：';
+      container.innerHTML = list.map((f, i) =>
+        '<div class="future-item"><span>○ ' + escapeHtml(f.text) + '</span><span class="future-del" data-i="' + i + '">×</span></div>'
+      ).join('');
+      preview.style.display = 'block';
+      container.querySelectorAll('.future-del').forEach(del => {
+        del.addEventListener('click', function() {
+          const idx = parseInt(this.dataset.i);
+          const allFuture = JSON.parse(localStorage.getItem('daily3_future') || '[]');
+          const remaining = allFuture.filter(f => !(f.date === tKey));
+          const dayList = allFuture.filter(f => f.date === tKey);
+          dayList.splice(idx, 1);
+          localStorage.setItem('daily3_future', JSON.stringify(remaining.concat(dayList)));
+          renderFuturePreview();
+        });
+      });
+    }
+  }
+
   function addTask() {
     const input = document.getElementById('taskInput');
     const text = input.value.trim();
     if (!text) return;
+
+    if (taskMode === 'tomorrow') {
+      const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+      const tKey = tomorrow.getFullYear() + '-' + String(tomorrow.getMonth()+1).padStart(2,'0') + '-' + String(tomorrow.getDate()).padStart(2,'0');
+      let future = JSON.parse(localStorage.getItem('daily3_future') || '[]');
+      future.push({ text: text, date: tKey });
+      localStorage.setItem('daily3_future', JSON.stringify(future));
+      input.value = '';
+      renderFuturePreview();
+      return;
+    }
+
     if (data[today].length >= 3) return;
     data[today].push({ text: text, done: false });
     saveData(data);
@@ -823,302 +944,97 @@
   }
 
   /* ==================================================================
-     QUOTES — 来自B站/微博/微信等平台高赞语录，点击头像随机显示
+     VOICE SYSTEM — 点击头像随机播放语音 + 同步显示台词
      ================================================================== */
-  const characterQuotes = {
-    xavier: [
-      '很高兴认识你，不是客套。',
-      '下次在安全的地方见面吧。',
-      '第二杯半价也有人分享了。',
-      '没遇见春天，先遇见了你。',
-      '两个人一起，好像也不错。',
-      '今天可以蹭饭吗……',
-      '一起走吧，耳机分你一半。',
-      '楼下的猫很想你，我也是。',
-      '没有失眠也可以随时找我。',
-      '你让生活变得有趣多了。',
-      '每一句明天见都不食言。',
-      '和你有关的事，都很重要。',
-      '走不动的话我背你，走得动，也可以背。',
-      '总有一颗星星是为你亮的。',
-      '你在哪里，光就在哪里。',
-      '我的光芒，只朝向你在的方向。',
-      '我会和星光一起守护你。',
-      '还是让星星自己落下来，留在你身边吧。',
-      '星星太远了，听不到你在叫它，但沈星回听得到。',
-      '把星光戴在手上，怎么样？',
-      '我很庆幸能成为那颗璀璨星辰的同行者。',
-      '才说了再见就开始想你。',
-      '总梦到一个人，代表什么？',
-      '这一路上，闪电拂过星尘有无数个瞬间。但我不能停下。我的意思是……我好想你。',
-      '原来入了心的人，见与不见都会思念。',
-      '想见你，不只是某日限定。',
-      '晚安，我的白日梦。',
-      '我的心只会被一个人拨动。',
-      '你总是我微笑的理由。',
-      '想和你去时间尽头看看。',
-      '宇宙在你沉睡时消失不见，群星在你出现后熠熠生辉。',
-      '我只是一颗星体，浮游于沉睡的黑暗。',
-      '如果这个世界真的已经无处可逃，那至少，你还可以逃来我身边。',
-      '何必哭诉非春时，他来之日即是春。',
-      '只要我的心脏还在跳动，就会站在你身边，直到最后一刻。',
-      '宇宙吸引力法则第二条——想见的人，无论过多久都会再见。',
-      '我不会离开，因为你还在这里。',
-      '星辰花开之时，远航的人就会回到故乡。',
-      '想做的不只是你的搭档。',
-      '合理，合法，合情，和你。',
-      '我绕得过万里山河错落，绕不过你。',
-      '你是我耗尽最后热情，也要坚定的选择。',
-      '因为心里有一个满分的人，所以看谁都差点意思。',
-      '爱是两个独立人格的相互吸引、共同成长。',
-      '很高兴认识你，不是客套。',
-      '有个搭档好像也不错。',
-      '双人游戏不会再缺队友了。',
-      '看书时总忍不住分心看你。',
-      '换了双人沙发，想试试吗？',
-      '如果你迷路了，就在原地等我，我会找到你。'
-    ],
-    zayne: [
-      '我的目光，属于你很久了。',
-      '久别重逢，是个好词。',
-      '你是我最见效的药。',
-      '我也不只是你的主治医生。',
-      '送你的话，我总是顺路。',
-      '能让我心律失常的只有你。',
-      '保管好，我的心在你那里。',
-      '灵魂先于我的记忆，认出了你。',
-      '你总是特例。',
-      '只要伞面的雪不融化，你就什么都不用怕。',
-      '照顾你这件事就交给我了。',
-      '你出现就是我的休息时间。',
-      '拥抱不是生病才有的特权。',
-      '你的出现从来不会是打扰。',
-      '你是噩梦唯一的解法。',
-      '今天我替小雪豹陪你。',
-      '如果你想的话，哪怕是酷暑也会有只属于你的雪落下。',
-      '和你分开的这几天，我没有一刻不在想你。',
-      '如果是周末见你，我一般从周四开始高兴。',
-      '因为你，我期待每一个明天。',
-      '冰雪因为你的笑而融化。',
-      '仪式感和惊喜都只属于你。',
-      '想把每一刻都变成永恒。',
-      '你永远都在我的计划中。',
-      '每一个周末都供你支配。',
-      '和你见面，是最好的放松。',
-      '希望你不要生病，不要受伤，不要总和黎医生见面，而是多和黎深见面。',
-      '光阴漫长，你不是第一个进入荆棘高塔的人，但是除了你，没有人能让茉莉盛开。',
-      '在梦里跟着茉莉的香气走，就一定可以回到我身边。',
-      '那等我在你的黄昏醒来，再对你说早安。',
-      '我们会在下一个黎明来的时候再见面。',
-      '每一个下雪的日子，都让我想起一个人……好在，就要见面了。',
-      '日久生情的两个人，在很久不见面后再次见面，也会一见钟情。',
-      '我敢迈出第一步，当然是因为我很清楚，往后的每一步都不会落空。',
-      '不着急走的话，一起等雨停吧。',
-      '不知道这支桃花，能换来春天的第一个拥抱吗？',
-      '别人怎么说不重要，你心里那把尺才是准绳。',
-      '就应该这样，吃好喝好，让活着的每一天都像是在度假。',
-      '在遇见她之前，我不会知道什么是寂寞。',
-      '别人有别人的故事，我们不是别人。',
-      '等雨停了，我们还要继续约会。',
-      '一键跳过今天的方法有很多种……或者马上就见面，把明天变成今天。',
-      '如果我有十种笑容都是真正感到幸福时才会出现，那这十种的样子你一定都见过。',
-      '拿你没办法，是在夸你。',
-      '有雪使者在身边，每一片雪花都会记得你的名字。',
-      '宇宙在你沉睡时消失不见，群星在你出现后熠熠生辉。',
-      '想见我不用挂号，直说就行。',
-      '这么费神才能维护的关系，有必要保留吗？',
-      'Love is the one thing that transcends time and space.',
-      '灵魂先于我的记忆，认出了你。'
-    ],
-    rafayel: [
-      '海底三万里，万物静寂，世间再无第二个利莫里亚。',
-      '你相信，海底也会燃起火焰吗？',
-      '遇见你是一场宇宙级的浪漫邂逅。',
-      '我细数着星辰变换、日月更迭，只为迎接与你重逢的那一刻璀璨。',
-      '等你来，每一天都有了意义；想见你，一刻也等不及到明天。',
-      '那把我的心给你，你要吗？它早就为你空出了所有位置。',
-      '我想看的世界，在你眼里。',
-      '你的出现把我的生活搅成了独一无二的色彩。',
-      '这幅画只需要两个主色调，一半是我，另一半属于你。',
-      '这对耳朵一点自控力也没有，一听到你的声音就会动。',
-      '我带了我喜欢的女孩回家，从今往后，这里也是你的家。',
-      '紫藤花代表的是……最幸福的时刻，也就是遇见你的时刻。',
-      '你是我永恒幻想的主角，唯有你能让我如此。',
-      '骗其他人可以，想骗过我，不可能。',
-      '明早起来新的谣言又该满天飞了，但没关系，和你有关的一切都值得。',
-      '只是因为在人群中多看了你一眼，你就把远方的花带给我了。',
-      '其实，我想看的不仅仅是落日余晖，还有你身边的那抹温暖光芒。',
-      '我是你的。',
-      '别怕这片海，它曾温柔地以鱼群环绕欢迎你。',
-      '我的鳞片在月光下闪耀着承诺的光芒，它会永远守护着我们之间的约定。',
-      '拥有无尽生命的我也会有害怕失去的时候，那就是没有你的日子。',
-      '为了靠近你我愿意付出所有，哪怕变成人类也要和你共度此生。',
-      '曾经的海神，为了心爱的人欺骗了整个海洋。',
-      '鱼在水中游，是尾也是头。',
-      '传说中你为爱甘心被搁浅，我也可以为你潜入海里面。',
-      '以前不喜欢小鸟，直到有只闯进画室踩满颜料，像你闯进我的生活带来灵感。',
-      '祝你想笑的时候就笑，想哭的时候就哭，永远自由惬意，无拘无束。',
-      '人生舞台聚散离合皆因缘起，保持微笑面对风雨变换吧。',
-      '美好稍纵即逝，唯有及时把握才能不留遗憾在心间。',
-      '既然拉钩了，那一百年、一千年都不许变了。',
-      '来年花开之时我们再约此处赏花可好。',
-      '只要你需要我，随时待命，为你守候每一个重要时刻。',
-      '与你在一起的每个瞬间，都值得被珍藏成永恒的记忆篇章。',
-      '你掌心的温度如同海底暖流，终将深深烙印在我心底。',
-      '海风带走了烦恼，留下的是我们的欢笑和彼此心中的坚定。',
-      '烟花易冷，流星短暂，但愿望因你而闪耀。',
-      '当天空变成你眼睛的颜色，我就会在这片我们相遇的海上重新爱上你。',
-      '若真有神明存在，那神定是以人心为形，助人间烟火更添温馨色彩。',
-      '从不是深渊囚禁了你，是你遗忘了月光下的自己，该去追寻光明了。',
-      '对于外界喧嚣我从不介怀，只在乎与我并肩站在星光下的人是谁。',
-      '你的偶尔小矫情，在我看来比任何表演都更加真实动人。',
-      '那夜窗边的轻吻，你的哼唱虽略走调，却是我听过最美的旋律。',
-      '我高于世间的一切，却低于我的爱人。',
-      '差点以为，你想起我了。',
-      '知道吗？在这浩瀚宇宙中能遇到你，是我最美丽的意外收获。',
-      '大雾四起，每一步都是爱的足迹。',
-      '我数着每天的潮涨潮落，日升月起，终于，要等到和你见面的日子了。',
-      '每天都在倒数时光流转，直到那一天——我们终将相见。',
-      '看啊！只要心怀希望，即使严冬过后废墟之上也能绽放出生命之花。',
-      '爱情是通往未来的钥匙，它能让我们跨越千山万水实现共同的梦。'
-    ],
-    sylus: [
-      '遇见你时本以为只是一场无聊游戏的意外，后来这场意外却被加上了唯一的前缀。',
-      '这样满意了么？大小姐，以后我的地盘和我，都归你管。',
-      '我习惯了独来独往，但你的出现，让我想有个可以回去的家。',
-      '我不在乎临空市怎么样，我关心的对象是你。',
-      '你还想从我的眼睛里找出什么，我的视线里只有你。',
-      '我秦彻想要的东西，从来没有得不到的，包括你。',
-      '你是我生命中最特别的存在，没有人可以替代你在我心中的位置。',
-      '行动胜于言语，得让大家看到，我有心上人了。',
-      '见到你之前，还以为今天又会是无趣的一天。',
-      '阳光照不到的地方总有阴影，碰巧我又是个喜欢生活在暗处的人，但我不罩着你，难道还要别人来？',
-      '在我的气场下，没人能伤害你，包括命运。',
-      '哪个臭小子敢让你受委屈？他完蛋了。',
-      '就算要出卖灵魂，也要找个付得起钱的人。',
-      '你最亲近的人，或许才是最想要你命的人。',
-      '你欠我一场比死亡更隆重的谢幕礼。',
-      '既然要与恶魔并肩，就得有和我一起坠落的勇气。',
-      '别妄自菲薄，你比你想象中有用得多。',
-      '在你的沉沦之前，我会把你拉出来。所以尽管奔向我，我会是你的最后一层防线。',
-      '保护你是最高优先级指令……即使违背我的底层逻辑。',
-      '日记的真正结尾是——坠毁的舰艇变成了摇篮，废土长出了嫩芽，而我遇见了你。',
-      '龙会期待着每一个夜晚，风和花瓣的来临，就像我期待每一次与你相见。',
-      '你和太阳一起出现，会让阳光也变得没那么讨厌。',
-      '深空无坐标，但你是我的引力奇点。',
-      '星河倾倒也不及你眼里的光……那才是我的宇宙。',
-      '飞走的航班还会再回来。',
-      '曾有同样的月光落在我们的肩头。',
-      '其实，塔尔城也可以开满鲜花……只为一个人开放。',
-      '有人远道而来，她说不想看我输。所以，我赢了。',
-      '只有一个晚安不太够，我还想听点别的。',
-      '我喜欢你得寸进尺。',
-      '我的目光一直在你身上，想躲也躲不开。',
-      '你亲自当饵，我很乐意上当。',
-      '心率超基准值42%……你对我进行非法系统侵入？',
-      '最后一颗子弹留给你——要么杀我，要么爱我。',
-      '威士忌灼烧喉咙时…我渴望你更烈的吻。',
-      '子弹不必躲…我的枪口永远为你偏移。',
-      '你的心跳好像比表情更诚实。',
-      '你可以先在我这里解决情绪，然后我们再一起解决问题。',
-      '我知道你不脆弱，但受伤会痛，生病会难受，多依赖我一点也没事。',
-      '不想习惯也没关系。不管是什么结局，我都会在最后陪着你。',
-      '比起预支承诺，我更想把以后的事，交给以后的我们。',
-      '我总会想到哄你的办法，只要你还在我身边。',
-      '在谈判桌上，我永远有办法让别人妥协，但在你这里，先投降的似乎总是我。',
-      '想见你，不需要什么理由。',
-      '我的诞生是为毁灭…直到你成了我存在的意义。',
-      '向下坠落的感觉……但灵魂反而会变得很轻。',
-      '其实，塔尔城也可以开满鲜花。',
-      '不是你说的么？我很直白，喜欢你这件事，藏不住也不想藏。',
-      '我最讨厌阳光，但你和太阳一起出现的时候，我心动了。',
-      '最后一颗子弹，要么杀了我，要么吻我。'
-    ],
-    caleb: [
-      '引力的起点是你，终点也是你。',
-      '我不罩着你，难道还要别的人来……',
-      '所有朝你打来的风雨，都不该出现在这个世界上。',
-      '本来就该我罩着你一辈子。',
-      '我会回到有你在的地方。',
-      '想一直抱你，靠肩头轻声说喜欢你。',
-      '下次牵手不需要理由。',
-      '今天不是路过，是来见你。',
-      '以后，睁眼就能见到我。',
-      '只想降落在你身边。',
-      '我比你以为的，更爱你一点。',
-      '我的年龄比你大，手也比你大，上学也会比你早。',
-      '我是夏以昼，你哥哥。',
-      '是亲的怎么样，不是亲的又怎么样。',
-      '回到从前，只有你我的世界。',
-      '天行市没有无尽夏。',
-      '当年你牵我手让我当哥哥，如今长大就想放开？',
-      '下一世小海鸟，别再错过。',
-      '我们有更好的结局，属于我们的结局。',
-      '落叶的位置谱出一首诗，时间在消逝，有一种踏实是你心中有我名字。',
-      '你有没有想过，我从来都不是你的哥哥。',
-      '你最大的错，就是以为我愿意一直扮演你的好哥哥。',
-      '我可不是什么越喜欢就越会克制的人。',
-      '别紧张，没喊你哥，自己换称呼？今晚跑不掉了。',
-      '再当我小孩，就往你碗里加香菜。',
-      '给它系了一个铃铛，它就再也逃不掉了……这样的铃铛，是不是也该给你系一个？',
-      '那些觊觎你力量、想要伤害你的人，不论是谁……都该消失。',
-      '不需要我？一座房子不够，那就给你建一座迷宫。',
-      '不以哥哥身份关心，就不是真心了吗？',
-      '那你也拥有一点罪，好不好，别让我太孤独了。',
-      '我是你的。',
-      '我想要你留在这里，留下来，跟我过一百年。',
-      '如果每一个问题都通向远离你的结局，那就用一辈子的时间来寻找解决的办法吧。',
-      '你愿意给的，就是我想要的。只要你要，我都给。',
-      '死过一次，不会再死一次。',
-      '如果这是感受你的代价，那我接受。',
-      '不用平分，我的都归你。',
-      '夏以昼的弱点，与你有关。',
-      '和好券的有限期是永远。',
-      '刚到家，累死我了……但结果还不错。',
-      '摸摸头是习惯，改不掉的。',
-      '在我这里，还是可以任性。',
-      '如果想发脾气，就冲我来。',
-      '你想吃的我都会做。',
-      '项链戴着呢，要不要摸摸看。',
-      '我们回家。',
-      '这是第一次让我见识爱情可以慷慨又自私。',
-      '看见你从门口进来，就想起小时候奶奶总在门顶挂平安结。',
-      '我们需要从长计议，然后一言为定。',
-      '如果你出了问题，我们月底就不能一起去看奶奶了。'
-    ]
-  };
-
-  // 点击头像 → 语录显示在头像和标题之间的 quote-line
   const quoteLine = document.getElementById('quoteLine');
+  let voiceConfig = {};
+  let currentAudio = null;
+  let currentLineTimer = null;
+
+  fetch('voices_config.json')
+    .then(r => r.json())
+    .then(data => { voiceConfig = data; })
+    .catch(e => console.warn('语音配置加载失败:', e));
+
+  function splitTextToLines(text) {
+    if (!text) return [''];
+    const parts = text.split(/[，。！？,\.\!\?、；;：:\s]+/).filter(s => s.length > 0);
+    return parts.length ? parts : [text];
+  }
+
+  function stopCurrentVoice() {
+    if (currentAudio) { currentAudio.pause(); currentAudio.currentTime = 0; currentAudio = null; }
+    clearTimeout(currentLineTimer);
+    quoteLine.classList.remove('show');
+  }
+
+  function displayLines(lines, totalDuration) {
+    if (!lines.length) return;
+    const lineDuration = Math.max(0.8, totalDuration / lines.length);
+    let idx = 0;
+    function showNext() {
+      if (idx >= lines.length) return;
+      quoteLine.textContent = lines[idx];
+      quoteLine.classList.add('show');
+      idx++;
+      if (idx < lines.length) currentLineTimer = setTimeout(showNext, lineDuration * 1000);
+    }
+    showNext();
+  }
+
+  function onVoiceEnd(avatar) {
+    avatar.classList.remove('voice-active');
+    quoteLine.classList.remove('show');
+    currentAudio = null;
+    clearTimeout(currentLineTimer);
+  }
+
+  // 点击头像 → 随机语音 + 同步文字
   let quoteTimer = null;
 
   document.querySelectorAll('.avatar-wrap').forEach(wrap => {
     wrap.addEventListener('click', function() {
       const charKey = this.dataset.char;
+      const avatar = this.querySelector('.avatar');
       if (!charKey) return;
 
-      const quotes = characterQuotes[charKey];
-      if (!quotes) return;
+      const segments = voiceConfig[charKey];
+      if (!segments || !segments.length) {
+        stopCurrentVoice();
+        quoteLine.textContent = '夏以昼正在路上，敬请期待 ✨';
+        quoteLine.classList.add('show');
+        avatar.classList.add('voice-active');
+        setTimeout(() => { avatar.classList.remove('voice-active'); quoteLine.classList.remove('show'); }, 2000);
+        return;
+      }
 
-      const quote = quotes[Math.floor(Math.random() * quotes.length)];
-      const avatar = this.querySelector('.avatar');
+      stopCurrentVoice();
+      document.querySelectorAll('.avatar').forEach(a => a.classList.remove('voice-active'));
 
-      // 光晕动画
-      avatar.classList.add('quote-active');
-      setTimeout(() => avatar.classList.remove('quote-active'), 1500);
+      const seg = segments[Math.floor(Math.random() * segments.length)];
+      const audioPath = 'output/' + charKey + '/' + seg.file;
+      avatar.classList.add('voice-active');
+      currentAudio = new Audio(audioPath);
+      const lines = splitTextToLines(seg.text);
 
-      // 显示在中间语录行
-      quoteLine.textContent = '「' + quote + '」';
-      quoteLine.style.opacity = '1';
-
-      // 5秒后渐隐
-      clearTimeout(quoteTimer);
-      quoteTimer = setTimeout(() => {
-        quoteLine.style.opacity = '0';
-      }, 5000);
+      currentAudio.addEventListener('loadedmetadata', () => {
+        const dur = currentAudio.duration;
+        if (dur && isFinite(dur)) displayLines(lines, dur);
+        else { quoteLine.textContent = seg.text; quoteLine.classList.add('show'); }
+      });
+      currentAudio.addEventListener('ended', () => onVoiceEnd(avatar));
+      currentAudio.addEventListener('error', () => {
+        quoteLine.textContent = seg.text; quoteLine.classList.add('show');
+        setTimeout(() => onVoiceEnd(avatar), 3000);
+      });
+      currentAudio.play().catch(() => {
+        quoteLine.textContent = seg.text; quoteLine.classList.add('show');
+        setTimeout(() => onVoiceEnd(avatar), 3000);
+      });
     });
   });
 
+  loadFutureTasks();
   renderTasks();
 
   /* ==================================================================

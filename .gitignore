@@ -1,3 +1,14 @@
-dragon-test-*.png
-Thumbs.db
-Desktop.ini
+# 语音处理备份目录
+output/*/_original/
+output/*/_volume_backup/
+output/*/_done/
+
+# Python
+__pycache__/
+*.pyc
+
+# 输入素材
+input/
+
+# 开发工具
+audioop.py

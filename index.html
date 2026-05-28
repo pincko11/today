@@ -556,19 +556,19 @@
         <span class="task-count" id="taskCountLabel">0/3</span>
       </div>
       <div id="taskList"></div>
+      <div class="task-mode" id="taskMode">
+        <button class="mode-btn active" data-mode="today">今天</button>
+        <button class="mode-btn" data-mode="tomorrow">明天</button>
+      </div>
       <div class="add-task" id="addTaskRow" style="display:none;">
-        <div class="task-mode" id="taskMode">
-          <button class="mode-btn active" data-mode="today">今天</button>
-          <button class="mode-btn" data-mode="tomorrow">明天</button>
-        </div>
         <div class="add-task-row">
           <input type="text" id="taskInput" placeholder="今天最重要的一件事是..." maxlength="60">
           <button id="addBtn">＋ 添加</button>
         </div>
-        <div class="future-preview" id="futurePreview" style="display:none;">
-          <div class="future-label"></div>
-          <div id="futureList"></div>
-        </div>
+      </div>
+      <div class="future-preview" id="futurePreview" style="display:none;">
+        <div class="future-label"></div>
+        <div id="futureList"></div>
       </div>
     </div>
   </div>
@@ -779,7 +779,8 @@
     });
     const dc = list.filter(t => t.done).length;
     taskCountLabel.textContent = dc + '/' + list.length;
-    addTaskRow.style.display = list.length < 3 ? 'flex' : 'none';
+    if (taskMode === 'tomorrow') { addTaskRow.style.display = 'flex'; }
+    else { addTaskRow.style.display = list.length < 3 ? 'flex' : 'none'; }
   }
 
   function escapeHtml(str) {
@@ -803,10 +804,12 @@
       const input = document.getElementById('taskInput');
       if (taskMode === 'tomorrow') {
         input.placeholder = '提前写下明天要做的事...';
+        addTaskRow.style.display = 'flex';
         renderFuturePreview();
       } else {
         input.placeholder = '今天最重要的一件事是...';
         document.getElementById('futurePreview').style.display = 'none';
+        if (data[today].length >= 3) addTaskRow.style.display = 'none';
       }
     });
   });

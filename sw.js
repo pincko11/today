@@ -1,8 +1,9 @@
-const CACHE = 'daily3-v5';
+const CACHE = 'daily3-v6';
 const FILES = [
   './',
   './index.html',
   './manifest.json',
+  './voices_config.json',
   './icon.svg',
   './icon.png',
   './xavier.jpg',

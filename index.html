@@ -83,16 +83,20 @@
     transition: transform var(--bounce), box-shadow var(--bounce);
     background: #f0ecf6;
   }
-  .avatar-wrap:hover .avatar {
-    transform: translateY(-6px) scale(1.15);
-    box-shadow: 0 8px 28px rgba(45,38,64,0.16), 0 0 0 8px rgba(108,93,167,0.12);
-    z-index: 5;
+  @media (hover: hover) {
+    .avatar-wrap:hover .avatar {
+      transform: translateY(-6px) scale(1.15);
+      box-shadow: 0 8px 28px rgba(45,38,64,0.16), 0 0 0 8px rgba(108,93,167,0.12);
+      z-index: 5;
+    }
   }
 
   /* 语录闪烁光晕 */
   .avatar.quote-active,
   .avatar.voice-active {
     animation: avatar-quote-glow 0.5s ease-in-out infinite;
+    transform: translateY(-6px) scale(1.15);
+    z-index: 5;
   }
   @keyframes avatar-quote-glow {
     0%, 100% { box-shadow: 0 2px 12px rgba(45,38,64,0.10), 0 0 0 4px rgba(108,93,167,0.08); }
